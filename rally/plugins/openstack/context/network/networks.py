@@ -79,6 +79,6 @@ class Network(context.Context):
             for network in tenant_ctx.get("networks", []):
                 with logging.ExceptionLogger(
                         LOG,
-                        _("Failed to delete network for tenant %s")
-                        % tenant_id):
+                        _("Failed to delete network %s for tenant %s")
+                        % (network["id"], tenant_id)):
                     net_wrapper.delete_network(network)
