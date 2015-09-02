@@ -412,3 +412,39 @@ class NeutronScenario(scenario.OpenStackScenario):
         self._warn_about_deprecated_name_kwarg(vip, vip_update_args)
         body = {"vip": vip_update_args}
         return self.clients("neutron").update_vip(vip["id"], body)
+
+    @atomic.action_timer("neutron.create_healthmonitor")
+    def _create_v1_healthmonitor(self):
+        # XXX Maybe we'd like to have these values as scenario arguments
+        body = {
+            "health_monitor": {
+                "delay": 100,
+                "max_retries": 1,
+                "type": "TCP",
+                "timeout": 60,
+            }
+        }
+        res = self.clients("neutron").create_health_monitor(body=body)
+        return res["health_monitor"]
+
+    @atomic.action_timer("neutron.list_healthmonitors")
+    def _list_v1_healthmonitors(self):
+        return self.clients("neutron").list_health_monitors()["health_monitors"]
+
+    @atomic.action_timer("neutron.update_healthmonitor")
+    def _update_v1_healthmonitor(self, health_monitor_id, body):
+        res = self.clients("neutron").update_health_monitor(health_monitor_id,
+                                                            body=body)
+        return res["health_monitor"]
+
+    @atomic.action_timer("neutron.delete_healthmonitor")
+    def _delete_v1_healthmonitor(self, health_monitor):
+        self.clients("neutron").delete_health_monitor(health_monitor)
+
+    def _associate_v1_healthmonitor(self, health_monitor_id, pool_id):
+        body = {
+            "health_monitor": {
+                "id": health_monitor_id
+            }
+        }
+        self.clients("neutron").associate_health_monitor(pool_id, body=body)
