@@ -448,3 +448,44 @@ class NeutronScenario(scenario.OpenStackScenario):
             }
         }
         self.clients("neutron").associate_health_monitor(pool_id, body=body)
+
+    def _create_lb_member(self, pool_id, address, atomic_action=True, **member_create_args):
+        args = {
+            "pool_id": pool_id,
+            "address": address
+        }
+        args.update(member_create_args)
+        if atomic_action:
+            with atomic.ActionTimer(self, "neutron.create_member"):
+                return self.clients("neutron").create_member({"member": args})
+        return self.clients("neutron").create_member({"member": args})
+
+    @atomic.action_timer("neutron.delete_member")
+    def _delete_v1_member(self, member):
+        """Delete neutron member
+
+        :param member: Member dict
+        """
+        return self.clients("neutron").delete_member(member["id"])
+
+    def _create_v1_members(self, networks, pools, **member_create_args):
+        manager = self.clients("nova").servers
+        members = []
+        for network in networks:
+            if not network.get("servers"):
+                continue
+            subnet = network["subnets"][0]
+            member_pool = None
+            # Find pool for network subnet
+            for pool in pools:
+                if pool["pool"]["subnet_id"] == subnet:
+                    member_pool = pool["pool"]["id"]
+            for server_id in network.get("servers"):
+                server = manager.get(server_id)
+                for network_name, ips in server.networks.items():
+                    if not network_name == network["name"]:
+                        continue
+                    members.append(self._create_lb_member(member_pool,
+                                                          ips[0],
+                                                          **member_create_args))
+        return members
