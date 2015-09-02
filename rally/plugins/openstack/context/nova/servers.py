@@ -106,3 +106,86 @@ class ServerGenerator(context.Context):
     def cleanup(self):
         resource_manager.cleanup(names=["nova.servers"],
                                  users=self.context.get("users", []))
+
+
+@context.configure(name="network_servers", order=431)
+class NetworkServerGenerator(context.Context):
+    """Context class for adding temporary servers for benchmarks.
+
+        Servers are added for each network.
+    """
+
+    CONFIG_SCHEMA = {
+        "type": "object",
+        "$schema": consts.JSON_SCHEMA,
+        "properties": {
+            "image": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    }
+                }
+            },
+            "flavor": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    }
+                }
+            },
+            "servers_per_network": {
+                "type": "integer",
+                "minimum": 1
+            },
+        },
+        "required": ["image", "flavor"],
+        "additionalProperties": False
+    }
+
+    DEFAULT_CONFIG = {
+        "servers_per_network": 2,
+    }
+
+    @rutils.log_task_wrapper(LOG.info, _("Enter context: `NetworkServers`"))
+    def setup(self):
+        image = self.config["image"]
+        flavor = self.config["flavor"]
+        servers_per_network = self.config["servers_per_network"]
+
+        clients = osclients.Clients(self.context["users"][0]["endpoint"])
+        image_id = types.ImageResourceType.transform(clients=clients,
+                                                     resource_config=image)
+        flavor_id = types.FlavorResourceType.transform(clients=clients,
+                                                       resource_config=flavor)
+
+        for user, tenant_id in rutils.iterate_per_tenants(
+                self.context["users"]):
+            for index, network in enumerate(self.context["tenants"][tenant_id]["networks"]):
+                LOG.debug("Booting servers for user tenant %s in network %s"
+                          % (user["tenant_id"], network["id"]))
+                nova_scenario = nova_utils.NovaScenario({"user": user})
+
+                LOG.info("Calling _boot_servers with image_id=%(image_id)s "
+                         "flavor_id=%(flavor_id)s "
+                         "servers_per_network=%(servers_per_network)s "
+                         "net-id=%(net-id)s"
+                         % {"image_id": image_id,
+                            "flavor_id": flavor_id,
+                            "servers_per_network": servers_per_network,
+                            "net-id": network["id"]})
+
+                servers = nova_scenario._boot_servers(image_id, flavor_id,
+                                                      servers_per_network,
+                                                      nics=[{"net-id": network["id"]}])
+                current_servers = [server.id for server in servers]
+
+                LOG.info("Adding booted servers %s to context" % current_servers)
+
+                self.context["tenants"][tenant_id]["networks"][index]["servers"] = current_servers
+
+    @rutils.log_task_wrapper(LOG.info, _("Exit context: `NetworkServers`"))
+    def cleanup(self):
+        resource_manager.cleanup(names=["nova.servers"],
+                                 users=self.context.get("users", []))
