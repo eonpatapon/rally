@@ -1,0 +1,33 @@
+{
+    "NeutronNetworks.create_and_list_vips": [
+        {
+            "args": {
+                "vip_create_args": {
+                    "protocol_port": 80
+                }
+            },
+            "runner": {
+                "type": "constant",
+                "times": 50,
+                "concurrency": 10
+            },
+            "context": {
+                "users": {
+                    "tenants": 1,
+                    "users_per_tenant": 1
+                },
+                "network": {
+                    "networks_per_tenant": 3
+                },
+                "quotas": {
+                    "neutron": {
+                        "network": -1,
+                        "subnet": -1,
+                        "pool": -1,
+                        "vip": -1
+                    }
+                }
+            }
+        }
+    ]
+}

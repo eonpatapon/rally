@@ -329,3 +329,42 @@ class NeutronNetworks(utils.NeutronScenario):
         for i in range(ports_per_network):
             port = self._create_port(network, port_create_args or {})
             self._delete_port(port)
+
+    @validation.restricted_parameters(["subnet_id", "protocol", "pool_id", "name"],
+                                      subdict="vip_create_args")
+    @validation.required_services(consts.Service.NEUTRON)
+    @validation.required_openstack(users=True)
+    @validation.required_contexts("network")
+    @scenario.configure(context={"cleanup": ["neutron"]})
+    def create_and_delete_vips(self, vip_create_args=None):
+        networks = self.context.get("tenant", {}).get("networks", [])
+        subnets = []
+        for net in networks:
+            subnets.extend(net.get("subnets", []))
+        pools = []
+        for subnet_id in subnets:
+            pools.append(
+                self._create_lb_pool(subnet_id, atomic_action=False))
+        vip_create_args = vip_create_args or {"protocol_port": 80}
+        vips = self._create_v1_vips(pools, **vip_create_args)
+        for vip in vips:
+            self._delete_v1_vip(vip["vip"])
+
+    @validation.restricted_parameters(["subnet_id", "protocol", "pool_id", "name"],
+                                      subdict="vip_create_args")
+    @validation.required_services(consts.Service.NEUTRON)
+    @validation.required_openstack(users=True)
+    @validation.required_contexts("network")
+    @scenario.configure(context={"cleanup": ["neutron"]})
+    def create_and_list_vips(self, vip_create_args=None):
+        networks = self.context.get("tenant", {}).get("networks", [])
+        subnets = []
+        for net in networks:
+            subnets.extend(net.get("subnets", []))
+        pools = []
+        for subnet_id in subnets:
+            pools.append(
+                self._create_lb_pool(subnet_id, atomic_action=False))
+        vip_create_args = vip_create_args or {"protocol_port": 80}
+        self._create_v1_vips(pools, **vip_create_args)
+        self._list_v1_vips()
