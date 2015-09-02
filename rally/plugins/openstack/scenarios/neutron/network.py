@@ -368,3 +368,24 @@ class NeutronNetworks(utils.NeutronScenario):
         vip_create_args = vip_create_args or {"protocol_port": 80}
         self._create_v1_vips(pools, **vip_create_args)
         self._list_v1_vips()
+
+    @validation.restricted_parameters(["pool_id", "address", "protocol_port"],
+                                      subdict="member_update_args")
+    @validation.required_services(consts.Service.NEUTRON)
+    @validation.required_openstack(users=True)
+    @validation.required_contexts("network")
+    @validation.required_contexts("network_servers")
+    @scenario.configure(context={"cleanup": ["neutron", "nova"]})
+    def create_and_delete_members(self, member_create_args=None):
+        networks = self.context.get("tenant", {}).get("networks", [])
+        subnets = []
+        for net in networks:
+            subnets.extend(net.get("subnets", []))
+        pools = []
+        for subnet_id in subnets:
+            pools.append(
+                self._create_lb_pool(subnet_id, atomic_action=False))
+        member_create_args = member_create_args or {"protocol_port": 80}
+        members = self._create_v1_members(networks, pools, **member_create_args)
+        for member in members:
+            self._delete_v1_member(member["member"])

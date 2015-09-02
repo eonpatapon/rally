@@ -1,0 +1,41 @@
+{
+    "NeutronNetworks.create_and_delete_members": [
+        {
+            "args": {
+                "member_create_args": {
+                    "protocol_port": 80
+                }
+            },
+            "runner": {
+                "type": "constant",
+                "times": 50,
+                "concurrency": 10
+            },
+            "context": {
+                "users": {
+                    "tenants": 1,
+                    "users_per_tenant": 1
+                },
+                "network": {
+                    "networks_per_tenant": 2
+                },
+                "network_servers": {
+                    "servers_per_network": 2,
+                    "flavor": {
+                        "name": "m1.tiny"
+                    },
+                    "image": {
+                        "name": "^cirros.*uec$"
+                    }
+                },
+                "quotas": {
+                    "neutron": {
+                        "network": -1,
+                        "subnet": -1,
+                        "pool": -1
+                    }
+                }
+            }
+        }
+    ]
+}
