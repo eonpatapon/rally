@@ -347,3 +347,68 @@ class NeutronScenario(scenario.OpenStackScenario):
         self._warn_about_deprecated_name_kwarg(pool, pool_update_args)
         body = {"pool": pool_update_args}
         return self.clients("neutron").update_pool(pool["pool"]["id"], body)
+
+    def _create_lb_vip(self, pool_id, subnet_id, name, atomic_action=True, **vip_create_args):
+        """Create LB vip(v1)
+
+        :param pool_id: str, neutron lb pool-id
+        :param subnet_id: str, neutron subnet-id
+        :param name: str, neutron lb vip name
+        :param atomic_action: True if this is an atomic action
+        :returns: dict, neutron lb vip
+        """
+        args = {
+            "subnet_id": subnet_id,
+            "pool_id": pool_id,
+            "name": name
+        }
+        args.update(vip_create_args)
+        if atomic_action:
+            with atomic.ActionTimer(self, "neutron.create_vip"):
+                return self.clients("neutron").create_vip({"vip": args})
+        return self.clients("neutron").create_vip({"vip": args})
+
+    def _create_v1_vips(self, pools, **vip_create_args):
+        """Create LB vips(v1)
+
+        :param pool: list, pool dicts
+        :param vip_create_args: dict, POST /lb/vips request options
+        :returns: list, neutron lb vips
+        """
+        vips = []
+        with atomic.ActionTimer(self, "neutron.create_%s_vip" %
+                                len(pools)):
+            for pool in pools:
+                vips.append(self._create_lb_vip(pool["pool"]["id"],
+                                                pool["pool"]["subnet_id"],
+                                                self._generate_random_name("rally_vip_"),
+                                                protocol=pool["pool"]["protocol"],
+                                                **vip_create_args))
+        return vips
+
+    @atomic.action_timer("neutron.list_vips")
+    def _list_v1_vips(self, **kwargs):
+        """Return user vip list(v1)."""
+        return self.clients("neutron").list_vips(**kwargs)
+
+    @atomic.action_timer("neutron.delete_vip")
+    def _delete_v1_vip(self, vip):
+        """Delete neutron vip
+
+        :param vip: Vip dict
+        """
+        return self.clients("neutron").delete_vip(vip["id"])
+
+    @atomic.action_timer("neutron.update_vip")
+    def _update_v1_vip(self, vip, **vip_update_args):
+        """Update vip.
+
+        This atomic function updates the vip with vip_update_args.
+
+        :param vip: Vip dict
+        :param vip_update_args: dict, POST /lb/vips update options
+        :returns: updated neutron vip dict
+        """
+        self._warn_about_deprecated_name_kwarg(vip, vip_update_args)
+        body = {"vip": vip_update_args}
+        return self.clients("neutron").update_vip(vip["id"], body)
