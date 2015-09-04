@@ -139,6 +139,18 @@ class KeystoneV2Wrapper(KeystoneWrapper):
                     domain_name="Default"):
         self._check_domain(domain_name)
         user = self.client.users.create(username, password, email, project_id)
+        for role in self.client.roles.list():
+            if "member" in role.name.lower():
+                try:
+                    self.client.roles.add_user_role(user.id, role.id,
+                                                    tenant=project_id)
+                except exceptions.Conflict:
+                    # User already has this role
+                    pass
+                else:
+                    break
+        else:
+            LOG.warning("Unable to set member role to created user.")
         return KeystoneV2Wrapper._wrap_v2_user(user)
 
     def delete_user(self, user_id):

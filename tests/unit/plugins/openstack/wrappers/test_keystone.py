@@ -93,11 +93,17 @@ class KeystoneV2WrapperTestCase(test.TestCase, KeystoneWrapperTestBase):
         self.assertFalse(hasattr(result[0], "extra_field"))
 
     def test_create_user(self):
-        self.wrapped_client.create_user("foo", "bar", email="foo@bar.com",
-                                        project_id="tenant_id",
-                                        domain_name="default")
+        fake_role = mock.MagicMock(id="fake_role_id")
+        fake_role.name = "__member__"
+        self.client.roles.list.return_value = [fake_role]
+        self.client.users.create.return_value = mock.MagicMock(
+            id="fake_user_id")
+
+        self.wrapped_client.create_user(
+            "foo", "bar", email="foo@bar.com",
+            project_id="project_id", domain_name="default")
         self.client.users.create.assert_called_once_with(
-            "foo", "bar", "foo@bar.com", "tenant_id")
+            "foo", "bar", "foo@bar.com", "project_id")
 
     def test_create_user_in_non_default_domain_fail(self):
         self.assertRaises(
